@@ -8,6 +8,8 @@
 
 ## かんたんな使い方
 
+**さいしょに1回だけ**: iPhone の Safari で https://nori-builds.github.io/step-timer/ を開き、共有ボタン →「ホーム画面に追加」。以後はホーム画面のアイコンから開きます。
+
 1. ホームでレシピ（例: 温泉卵）をタップ
 2. 手順の一覧を見て、必要なら時間を「今回だけ」変える → 「はじめる」
 3. 画面の案内どおりに進める。時間が来たらチャイムと声で知らせる
@@ -232,6 +234,13 @@
 
 | 項目 | 内容 |
 |---|---|
-| リポジトリ | https://github.com/nori-builds/step-timer （いまは private） |
-| 公開 URL | まだない（GitHub Pages は、無料プランでは public のリポジトリでしか使えない） |
+| 公開 URL | https://nori-builds.github.io/step-timer/ |
+| リポジトリ | https://github.com/nori-builds/step-timer （public） |
+| 公開元 | `main` ブランチのルート（GitHub Pages）。push すると数分で反映される |
 | コミットの作成者 | GitHub の noreply アドレス（このリポジトリだけの設定）。個人のメールアドレスは使わない |
+
+### iPhone に入れる
+
+1. iPhone の Safari で公開 URL を開く
+2. 共有ボタン →「ホーム画面に追加」
+3. 以後はホーム画面のアイコンから開く（`?test` なしの URL で追加する）
