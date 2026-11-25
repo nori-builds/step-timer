@@ -1,0 +1,1684 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="おなべ">
+<meta name="theme-color" content="#FFF7EC">
+<title>おなべタイマー</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --ink: #5B4636;
+    --ink-soft: #9A8272;
+    --cream: #FFF7EC;
+    --card: #FFFFFF;
+    --line: #F1E2D1;
+    --coral: #FF8A5B;
+    --coral-dark: #E2683A;
+    --alarm: #FFE45C;
+    --done: #C9F2CB;
+    --bg: var(--cream);
+    --accent: var(--coral);
+    --font: "Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro", "M PLUS Rounded 1c", "Kosugi Maru", "BIZ UDPGothic", system-ui, sans-serif;
+  }
+  body[data-heat="strong"] { --bg: #FFD6CC; --accent: #E2483A; }
+  body[data-heat="medium"] { --bg: #FFE3C4; --accent: #EE8420; }
+  body[data-heat="weak"]   { --bg: #FFF1C2; --accent: #D9A000; }
+  body[data-heat="off"]    { --bg: #DCEBFF; --accent: #4A7FD4; }
+  body[data-heat="none"]   { --bg: #F4EEE6; --accent: #8A7A6A; }
+  body[data-phase="done"]  { --bg: var(--done); --accent: #4FA65A; }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--bg);
+    min-height: 100dvh;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+    transition: background-color .6s ease;
+  }
+  input, textarea, select { font-family: inherit; color: inherit; -webkit-user-select: text; user-select: text; }
+  button { font-family: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+  [hidden] { display: none !important; }
+
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100dvh;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 28px);
+  }
+  .screen.active { display: flex; }
+
+  .top { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .top h1 { font-size: 20px; margin: 0; letter-spacing: .04em; }
+  .top-btns { display: flex; gap: 8px; }
+  .icon-btn { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--card); box-shadow: 0 2px 0 var(--line); font-size: 22px; font-weight: 800; }
+  .icon-btn svg { width: 24px; height: 24px; }
+  .test-badge { font-size: 12px; background: #333; color: #fff; padding: 2px 8px; border-radius: 99px; margin-left: 8px; vertical-align: middle; }
+  .hint { width: 100%; margin-top: 12px; padding: 10px 14px; border-radius: 14px; background: #FFF1B8; font-size: 13px; line-height: 1.6; }
+
+  .chara svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* ---------- ホーム ---------- */
+  #homeChara { width: 130px; height: 130px; margin-top: 8px; animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .recipes { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .recipe-btn {
+    width: 100%; text-align: left; background: var(--card); border-radius: 20px; padding: 16px 18px;
+    box-shadow: 0 4px 0 var(--line); display: flex; align-items: center; gap: 12px;
+  }
+  .recipe-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+  .recipe-btn .nm { font-size: 20px; font-weight: 800; line-height: 1.3; }
+  .recipe-btn .sm { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+  .recipe-btn .go { margin-left: auto; font-size: 26px; color: var(--coral); flex: none; }
+  .recipe-btn .grip { flex: none; width: 36px; height: 44px; margin: -6px 0 -6px -8px; display: grid; place-items: center; touch-action: none; cursor: grab; color: #CBB6A2; }
+  .recipe-btn .grip svg { width: 18px; height: 26px; }
+  .recipe-btn.dragging { position: relative; z-index: 5; box-shadow: 0 12px 24px rgba(91,70,54,.22); cursor: grabbing; }
+  .recipe-btn.dragging:active { box-shadow: 0 12px 24px rgba(91,70,54,.22); }
+  .recipe-btn.pressing { transform: scale(.98); transition: transform .3s; }
+  .recipes.sorting .recipe-btn:not(.dragging) { transition: transform .15s; }
+  .recipe-btn .del { flex: none; margin-left: auto; width: 46px; height: 46px; border-radius: 50%; background: #FFE1DC; color: #C0392B; font-size: 15px; font-weight: 800; display: none; place-items: center; }
+  .recipes.deleting .recipe-btn .del { display: grid; }
+  .recipes.deleting .recipe-btn .grip, .recipes.deleting .recipe-btn .go { display: none; }
+  .recipes.deleting .recipe-btn { box-shadow: 0 4px 0 #F6CFC8; }
+  .home-tools { width: 100%; display: flex; justify-content: center; margin-top: 12px; }
+  .link-btn.on { background: var(--ink); color: #fff; }
+  .toast button { margin-left: 12px; padding: 4px 12px; border-radius: 99px; background: #fff; color: var(--ink); font-size: 14px; font-weight: 800; }
+  .toast.has-btn { pointer-events: auto; }
+  .sort-note { width: 100%; text-align: center; font-size: 12px; color: var(--ink-soft); margin: 10px 0 0; }
+  .add-btn { width: 100%; padding: 16px; border-radius: 20px; border: 2px dashed #E3CDB6; font-size: 17px; font-weight: 700; color: var(--ink-soft); }
+
+  /* ---------- 始める前 ---------- */
+  .prep-title { width: 100%; font-size: 26px; margin: 14px 0 4px; line-height: 1.3; }
+  .box { width: 100%; background: var(--card); border-radius: 18px; padding: 12px 14px; margin-top: 10px; box-shadow: 0 2px 0 var(--line); }
+  .box h3 { margin: 0 0 6px; font-size: 14px; color: var(--ink-soft); }
+  .box p { margin: 0; font-size: 16px; line-height: 1.7; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
+  .plist { list-style: none; margin: 0; padding: 0; }
+  .plist li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .plist li:last-child { border-bottom: 0; }
+  .plist .n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 14px; background: var(--cream); }
+  .plist .tx { flex: 1; font-size: 16px; line-height: 1.45; }
+  .plist .tx small { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .plist .tm { flex: none; min-width: 72px; padding: 8px 10px; border-radius: 12px; background: var(--cream); font-weight: 800; font-size: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+  .plist .tm.changed { background: #FFE0CF; color: var(--coral-dark); }
+  .plist .tm.none { background: none; color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 99px; color: #fff; margin-right: 4px; vertical-align: 1px; }
+  .chip.strong { background: #E2483A; } .chip.medium { background: #EE8420; } .chip.weak { background: #D9A000; } .chip.off { background: #4A7FD4; }
+  .warn { width: 100%; font-size: 13px; line-height: 1.6; color: var(--ink-soft); margin: 12px 4px 0; }
+  .sticky { position: sticky; bottom: 0; width: calc(100% + 32px); display: flex; justify-content: center; margin: 16px -16px 0; padding: 12px 16px calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(transparent, var(--bg) 30%); }
+  #prep { padding-bottom: 0; }
+  .start {
+    width: min(100%, 320px); padding: 18px 0; border-radius: 32px; background: var(--coral); color: #fff;
+    box-shadow: 0 8px 0 var(--coral-dark); font-size: 30px; font-weight: 800; letter-spacing: .12em;
+  }
+  .start:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--coral-dark); }
+  .link-btn { padding: 10px 14px; border-radius: 99px; background: var(--card); font-size: 15px; font-weight: 700; box-shadow: 0 2px 0 var(--line); }
+
+  /* ---------- タイマー ---------- */
+  .run-head { width: 100%; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
+  .run-head .rn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run-head .pos { flex: none; background: rgba(255,255,255,.6); padding: 4px 12px; border-radius: 99px; }
+  .heat { margin-top: 10px; padding: 6px 22px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 26px; font-weight: 800; letter-spacing: .1em; }
+  .ring-wrap { position: relative; width: min(64vw, 260px); aspect-ratio: 1; margin: 10px 0 0; }
+  .ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 9; }
+  .ring-bg { stroke: rgba(255,255,255,.7); }
+  .ring-fg { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 339.29; transition: stroke-dashoffset .3s linear; }
+  .ring-wrap .chara { position: absolute; inset: 14%; }
+  .manual-chara { width: 170px; height: 170px; margin-top: 14px; }
+  .time { font-size: 72px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; margin-top: 6px; }
+  .time.paused { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .paused-label { font-size: 15px; font-weight: 800; color: var(--accent); margin-top: 4px; }
+  .do { font-size: 24px; font-weight: 800; text-align: center; line-height: 1.45; margin: 12px 0 0; word-break: keep-all; overflow-wrap: anywhere; }
+  .tip { font-size: 14px; color: var(--ink-soft); text-align: center; line-height: 1.6; margin: 6px 0 0; }
+  .nextp { font-size: 14px; color: var(--ink-soft); margin: 10px 0 0; text-align: center; }
+  .nextp b { color: var(--ink); }
+  .ctrls { display: flex; gap: 10px; margin-top: 16px; width: 100%; justify-content: center; }
+  .ctrl { flex: 1; max-width: 110px; padding: 14px 0; border-radius: 18px; background: rgba(255,255,255,.8); font-size: 17px; font-weight: 800; box-shadow: 0 3px 0 rgba(0,0,0,.08); }
+  .ctrl:active { transform: translateY(2px); box-shadow: none; }
+  .ctrl.pause { background: #fff; }
+  .next-btn { margin-top: 12px; width: min(100%, 340px); padding: 16px 0; border-radius: 22px; background: #fff; font-size: 20px; font-weight: 800; box-shadow: 0 4px 0 rgba(0,0,0,.1); }
+  .next-btn.big { padding: 26px 0; font-size: 28px; background: var(--accent); color: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.18); letter-spacing: .08em; }
+  .next-btn:active { transform: translateY(3px); }
+  .hold {
+    position: relative; overflow: hidden; margin-top: auto; padding: 12px 26px; border-radius: 99px;
+    background: rgba(255,255,255,.6); font-size: 15px; font-weight: 700; color: var(--ink-soft);
+  }
+  .hold-gap { height: 18px; flex: none; }
+  .hold::before { content: ""; position: absolute; inset: 0; background: rgba(226,104,58,.35); transform: scaleX(0); transform-origin: left; transition: transform .15s; }
+  .hold.holding::before { transform: scaleX(1); transition: transform var(--hold-ms, 1200ms) linear; }
+  .hold span { position: relative; }
+  .awake-note { font-size: 13px; color: var(--ink-soft); margin: 10px 0 0; }
+
+  /* おなべの子のうごき */
+  .lid { transform-box: fill-box; transform-origin: center bottom; }
+  .heat-strong .lid { animation: rattle .35s ease-in-out infinite; }
+  @keyframes rattle { 0%,100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-4px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
+  .steam path { animation: steam 2.4s ease-in-out infinite; opacity: 0; }
+  .steam path:nth-child(2) { animation-delay: .8s; }
+  .steam path:nth-child(3) { animation-delay: 1.6s; }
+  .heat-strong .steam path { animation-duration: 1.2s; }
+  @keyframes steam { 0% { opacity: 0; transform: translateY(6px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translateY(-18px); } }
+  .flame { transform-box: fill-box; transform-origin: center bottom; animation: flick .5s ease-in-out infinite alternate; }
+  .flame:nth-child(2) { animation-delay: .15s; } .flame:nth-child(3) { animation-delay: .3s; }
+  @keyframes flick { from { transform: scaleY(1); } to { transform: scaleY(.82); } }
+  .zzz text { font-family: var(--font); font-weight: 800; fill: #4A7FD4; animation: zz 2.4s ease-in-out infinite; }
+  .zzz text:nth-child(2) { animation-delay: .8s; } .zzz text:nth-child(3) { animation-delay: 1.6s; }
+  @keyframes zz { 0% { opacity: 0; transform: translate(0,0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px,-22px); } }
+
+  /* ---------- 時間が来たとき ---------- */
+  .overlay {
+    position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 24px; cursor: pointer;
+  }
+  .alarm { background: var(--alarm); animation: flash .6s ease-in-out infinite alternate; }
+  .alarm.quiet { animation: none; }
+  @keyframes flash { from { background: var(--alarm); } to { background: #FFF6B0; } }
+  .alarm .chara { width: 170px; height: 170px; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pop { from { transform: scale(.4); } to { transform: scale(1); } }
+  .alarm-title { font-size: clamp(40px, 13vw, 64px); font-weight: 800; letter-spacing: .06em; white-space: nowrap; }
+  .alarm-late { font-size: 18px; font-weight: 800; color: #C0392B; margin: 6px 0 0; }
+  .alarm-next { margin: 14px 0 0; font-size: 16px; font-weight: 700; }
+  .alarm-next b { display: block; font-size: 28px; line-height: 1.4; margin-top: 4px; word-break: keep-all; overflow-wrap: anywhere; }
+  .alarm-tap { margin-top: 22px; padding: 14px 28px; border-radius: 99px; background: #fff; font-size: 20px; font-weight: 800; }
+  .alarm-more { margin-top: 26px; padding: 10px 20px; border-radius: 99px; background: rgba(255,255,255,.55); font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+
+  /* ---------- できあがり ---------- */
+  #done { justify-content: center; text-align: center; }
+  #doneChara { width: 180px; height: 180px; animation: pop .7s cubic-bezier(.3,1.7,.5,1); }
+  .done-title { font-size: clamp(40px, 13vw, 60px); font-weight: 800; letter-spacing: .06em; }
+  .done-sub { font-size: 20px; font-weight: 700; margin: 4px 0 6px; }
+  .learn { width: 100%; text-align: left; }
+  .learn h3 { font-size: 16px; margin: 0 0 8px; }
+  .learn label { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.4; }
+  .learn label:last-of-type { border-bottom: 0; }
+  .learn input { width: 24px; height: 24px; flex: none; accent-color: #4FA65A; }
+  .learn .chg { margin-left: auto; flex: none; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .back { margin-top: 18px; width: min(100%, 300px); padding: 18px 0; font-size: 22px; font-weight: 800; border-radius: 28px; background: #fff; box-shadow: 0 6px 0 #9BD69F; }
+  .back:active { transform: translateY(4px); box-shadow: 0 2px 0 #9BD69F; }
+
+  /* ---------- 編集 ---------- */
+  #edit { align-items: stretch; }
+  .field { display: block; margin-top: 12px; }
+  .field > span { display: block; font-size: 14px; font-weight: 700; color: var(--ink-soft); margin: 0 4px 4px; }
+  .inp { width: 100%; border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 16px; background: #fff; line-height: 1.5; }
+  .inp:focus { outline: none; border-color: var(--coral); }
+  textarea.inp { resize: vertical; min-height: 64px; }
+  .estep { background: #fff; border-radius: 18px; padding: 12px; margin-top: 10px; box-shadow: 0 2px 0 var(--line); }
+  .estep-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .estep-head .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--cream); flex: none; }
+  .estep-head .sp { flex: 1; }
+  .mini { width: 38px; height: 38px; border-radius: 12px; background: var(--cream); font-size: 17px; font-weight: 800; }
+  .mini:disabled { opacity: .3; }
+  .erow { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .erow > .lb { font-size: 13px; font-weight: 700; color: var(--ink-soft); width: 52px; flex: none; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+  .seg button { padding: 8px 10px; border-radius: 10px; background: var(--cream); font-size: 14px; font-weight: 700; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .seg button.h-strong[aria-pressed="true"] { background: #E2483A; } .seg button.h-medium[aria-pressed="true"] { background: #EE8420; }
+  .seg button.h-weak[aria-pressed="true"] { background: #D9A000; } .seg button.h-off[aria-pressed="true"] { background: #4A7FD4; }
+  .time-btn { padding: 8px 14px; border-radius: 10px; background: var(--cream); font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .edit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .danger { color: #C0392B; }
+  .save-bar { position: sticky; bottom: calc(env(safe-area-inset-bottom) + 10px); display: flex; gap: 10px; margin-top: 18px; }
+  .save-bar button { flex: 1; padding: 16px 0; border-radius: 20px; font-size: 18px; font-weight: 800; }
+  .btn-primary { background: var(--coral); color: #fff; box-shadow: 0 5px 0 var(--coral-dark); }
+  .btn-sub { background: #fff; box-shadow: 0 5px 0 var(--line); }
+
+  /* ---------- シート ---------- */
+  .sheet-bg { position: fixed; inset: 0; z-index: 30; background: rgba(60,40,30,.4); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 520px; background: var(--cream); border-radius: 24px 24px 0 0; padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px); max-height: 90dvh; overflow-y: auto; }
+  .sheet h2 { margin: 0 0 14px; font-size: 20px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .row { background: #fff; border-radius: 16px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .row .lbl { font-weight: 700; font-size: 16px; line-height: 1.4; }
+  .row .lbl small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-soft); }
+  .switch { width: 56px; height: 32px; border-radius: 99px; background: #DDD; position: relative; transition: background .2s; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .switch[aria-checked="true"] { background: var(--coral); }
+  .switch[aria-checked="true"]::after { transform: translateX(24px); }
+  .pill-btn { flex: none; white-space: nowrap; padding: 10px 16px; border-radius: 99px; background: var(--coral); color: #fff; font-weight: 700; font-size: 15px; }
+  .note { font-size: 13px; line-height: 1.7; color: var(--ink-soft); margin: 14px 4px 0; }
+  .close-x { width: 40px; height: 40px; flex: none; border-radius: 50%; background: #fff; font-size: 20px; }
+  .ok-btn { display: block; width: min(100%, 280px); margin: 18px auto 0; padding: 14px 0; border-radius: 99px; background: var(--coral); color: #fff; font-size: 20px; font-weight: 800; letter-spacing: .06em; }
+  .text-btn { display: block; margin: 8px auto 0; padding: 12px 24px; font-size: 16px; font-weight: 700; color: var(--ink-soft); }
+
+  /* 時間の入力 */
+  .tset { text-align: center; }
+  .tset .big { font-size: 64px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 4px 0 12px; }
+  .tset .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tset .grid4 button { padding: 14px 0; border-radius: 14px; background: #fff; font-size: 16px; font-weight: 800; box-shadow: 0 2px 0 var(--line); }
+  .tset .orig { font-size: 13px; color: var(--ink-soft); margin-top: 10px; }
+
+  /* つかいかた */
+  .how { list-style: none; margin: 0; padding: 0; }
+  .how li { background: #fff; border-radius: 16px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 1.55; }
+  .how .n { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--cream); }
+  .sheet h3 { font-size: 16px; margin: 18px 4px 8px; }
+  .faq { background: #fff; border-radius: 16px; padding: 4px 14px; }
+  .faq p { margin: 0; padding: 10px 0; font-size: 15px; font-weight: 700; line-height: 1.6; border-bottom: 1px solid var(--line); }
+  .faq p:last-child { border-bottom: 0; }
+  .faq small { display: block; font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+
+  /* 音の確認 */
+  .sheet-bg.center { z-index: 35; align-items: center; padding: 16px; }
+  .gate { border-radius: 24px; max-width: 360px; text-align: center; padding: 24px 20px; }
+  .gate h2 { justify-content: center; font-size: 22px; margin: 4px 0 8px; }
+  .gate-icon { font-size: 52px; line-height: 1; }
+  .gate p { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.7; }
+
+  .how-box { background: #fff; border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; font-size: 15px; }
+  .mini-how { margin: 6px 0 0; padding-left: 1.3em; font-size: 14px; line-height: 1.7; color: var(--ink-soft); }
+  #newText { min-height: 150px; font-size: 15px; }
+  .imp-list { background: #fff; border-radius: 16px; padding: 6px 14px; font-size: 16px; font-weight: 700; line-height: 2; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); z-index: 40;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none; max-width: calc(100vw - 32px);
+    background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 20px; font-size: 15px; font-weight: 700; text-align: center;
+    transition: opacity .25s, transform .25s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body data-phase="home" data-heat="">
+
+<!-- ホーム -->
+<section id="home" class="screen active">
+  <header class="top">
+    <h1>おなべタイマー<span id="testBadge" class="test-badge" hidden>テスト</span></h1>
+    <div class="top-btns">
+      <button id="openHelp" class="icon-btn" aria-label="つかいかた">?</button>
+      <button id="openSettings" class="icon-btn" aria-label="設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+  <div id="installHint" class="hint" hidden>
+    Safari の <b>共有ボタン</b> →「<b>ホーム画面に追加</b>」でアプリとして使えます。レシピは、ホーム画面から開いたときのものが残ります。
+  </div>
+  <div id="homeChara" class="chara"></div>
+  <div id="recipeList" class="recipes"></div>
+  <button id="addRecipe" class="add-btn" style="margin-top:10px">＋ 新しいレシピ</button>
+  <p id="sortNote" class="sort-note">左の つまみ（または長押し）で つかむと、順番を変えられます</p>
+  <div class="home-tools"><button id="delMode" class="link-btn">レシピを消す</button></div>
+</section>
+
+<!-- 始める前 -->
+<section id="prep" class="screen">
+  <header class="top">
+    <button id="prepBack" class="icon-btn" aria-label="もどる">‹</button>
+    <button id="prepEdit" class="link-btn">なおす</button>
+  </header>
+  <h2 id="prepName" class="prep-title"></h2>
+  <div id="prepItemsBox" class="box"><h3>必要な物</h3><p id="prepItems"></p></div>
+  <div class="box">
+    <h3>手順 <span style="font-weight:400">（時間をタップすると、今回だけ変えられます）</span></h3>
+    <ol id="prepList" class="plist"></ol>
+  </div>
+  <p id="prepPresetNote" class="warn">時間は一般的な目安です。家に合わせて直してください。</p>
+  <p class="warn">ほかのアプリに切り替えたり、画面を消したりすると、音が鳴りません。</p>
+  <div class="sticky"><button id="startBtn" class="start">はじめる</button></div>
+</section>
+
+<!-- タイマー -->
+<section id="run" class="screen">
+  <div class="run-head"><span id="runName" class="rn"></span><span id="runPos" class="pos"></span></div>
+  <div id="runHeat" class="heat"></div>
+  <div id="timedBox" style="display:contents">
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="54"/><circle id="ringFg" class="ring-fg" cx="60" cy="60" r="54"/></svg>
+      <div id="runChara" class="chara"></div>
+    </div>
+    <div id="time" class="time">0:00</div>
+    <div id="pausedLabel" class="paused-label" hidden>一時停止中</div>
+  </div>
+  <div id="manualChara" class="chara manual-chara" hidden></div>
+  <p id="runDo" class="do"></p>
+  <p id="runTip" class="tip"></p>
+  <p id="runNext" class="nextp"></p>
+  <div id="timedCtrls" class="ctrls">
+    <button id="minus30" class="ctrl">−30秒</button>
+    <button id="pauseBtn" class="ctrl pause">一時停止</button>
+    <button id="plus30" class="ctrl">＋30秒</button>
+  </div>
+  <button id="nextBtn" class="next-btn">次へ ›</button>
+  <div class="hold-gap"></div>
+  <button id="stopBtn" class="hold"><span>ながおしで やめる</span></button>
+  <p id="awakeNote" class="awake-note" hidden>画面をつけたままにしてね</p>
+</section>
+
+<!-- 時間が来たとき -->
+<div id="alarm" class="overlay alarm" hidden>
+  <div id="alarmChara" class="chara"></div>
+  <div id="alarmTitle" class="alarm-title">時間です！</div>
+  <p id="alarmLate" class="alarm-late" hidden></p>
+  <p id="alarmNext" class="alarm-next"></p>
+  <div class="alarm-tap">タップで 次へ</div>
+  <button id="alarmMore" class="alarm-more">＋30秒 のばす</button>
+</div>
+
+<!-- できあがり -->
+<section id="done" class="screen">
+  <div id="doneChara" class="chara"></div>
+  <div class="done-title">できあがり！</div>
+  <div id="doneName" class="done-sub"></div>
+  <div id="learnBox" class="box learn" hidden>
+    <h3>次から、この時間にしますか？</h3>
+    <div id="learnList"></div>
+  </div>
+  <button id="backBtn" class="back">もどる</button>
+</section>
+
+<!-- 編集 -->
+<section id="edit" class="screen">
+  <header class="top">
+    <button id="editCancelTop" class="icon-btn" aria-label="やめる">✕</button>
+    <h1 id="editTitle" style="font-size:18px">レシピをなおす</h1>
+    <span style="width:44px"></span>
+  </header>
+  <label class="field"><span>名前</span><input id="eName" class="inp" maxlength="40" placeholder="例: 焼き餃子"></label>
+  <label class="field"><span>必要な物（材料や道具）</span><textarea id="eItems" class="inp" rows="2" placeholder="例: 餃子、フライパン、蓋、水100ml"></textarea></label>
+  <div class="field"><span>手順</span><div id="eSteps"></div></div>
+  <button id="eAddStep" class="add-btn" style="margin-top:10px">＋ 手順を足す</button>
+  <div class="edit-actions">
+    <button id="eDup" class="link-btn">複製する</button>
+    <button id="eShare" class="link-btn">送る</button>
+    <button id="eReset" class="link-btn">最初の状態に戻す</button>
+    <button id="eDelete" class="link-btn danger">消す</button>
+  </div>
+  <div class="save-bar">
+    <button id="editCancel" class="btn-sub">やめる</button>
+    <button id="editSave" class="btn-primary">保存</button>
+  </div>
+</section>
+
+<!-- 時間の入力 -->
+<div id="timeSheet" class="sheet-bg" hidden>
+  <div class="sheet tset" role="dialog" aria-labelledby="tsTitle">
+    <h2><span id="tsTitle">時間</span><button id="tsClose" class="close-x" aria-label="とじる">✕</button></h2>
+    <div id="tsBig" class="big">0:00</div>
+    <div class="grid4">
+      <button data-d="-60">−1分</button><button data-d="-10">−10秒</button><button data-d="10">＋10秒</button><button data-d="60">＋1分</button>
+    </div>
+    <p id="tsOrig" class="orig"></p>
+    <button id="tsOk" class="ok-btn">決める</button>
+    <button id="tsNone" class="text-btn">時間なしにする</button>
+    <button id="tsRevert" class="text-btn">元の時間に戻す</button>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div id="settings" class="sheet-bg" hidden>
+  <div class="sheet" role="dialog" aria-label="設定">
+    <h2>設定 <button id="closeSettings" class="close-x" aria-label="とじる">✕</button></h2>
+    <div class="row">
+      <div class="lbl">声で知らせる<small>手順の「やること」を読み上げます</small></div>
+      <button id="voiceSw" class="switch" role="switch" aria-checked="true" aria-label="声で知らせる"></button>
+    </div>
+    <div class="row">
+      <div class="lbl">音のテスト<small>小さいときは、横のボタンで大きくしてね</small></div>
+      <button id="testSound" class="pill-btn">鳴らす</button>
+    </div>
+    <h3 style="font-size:16px;margin:18px 4px 8px">レシピの保存と共有</h3>
+    <div class="row">
+      <div class="lbl">ファイルに保存<small>「"ファイル"に保存」で iCloud Drive に置けます</small></div>
+      <button id="exportFile" class="pill-btn">保存</button>
+    </div>
+    <div class="row">
+      <div class="lbl">読み込む<small>保存したファイルや、送られたリンクから</small></div>
+      <button id="openImport" class="pill-btn">読み込む</button>
+    </div>
+    <div class="row">
+      <div class="lbl">全部を送る<small>LINE などで送れるリンクを作ります</small></div>
+      <button id="shareAll" class="pill-btn">送る</button>
+    </div>
+    <div class="row">
+      <div class="lbl">消した 最初のレシピを 戻す</div>
+      <button id="restorePresets" class="pill-btn">戻す</button>
+    </div>
+    <p class="note">レシピは、この iPhone の中だけに保存されます。機種変更の前に「ファイルに保存」をしてください。</p>
+  </div>
+</div>
+
+<!-- 読み込み -->
+<div id="importSheet" class="sheet-bg" hidden>
+  <div class="sheet" role="dialog" aria-label="読み込む">
+    <h2>読み込む <button id="closeImport" class="close-x" aria-label="とじる">✕</button></h2>
+    <div class="row">
+      <div class="lbl">ファイルを選ぶ</div>
+      <button id="pickFile" class="pill-btn">選ぶ</button>
+      <input id="fileInput" type="file" accept=".json,application/json,text/plain" hidden>
+    </div>
+    <label class="field"><span>リンクを貼り付け</span><textarea id="pasteBox" class="inp" rows="3" placeholder="送られてきたリンクを ここに貼り付け"></textarea></label>
+    <button id="pasteOk" class="ok-btn">取り込む</button>
+  </div>
+</div>
+
+<!-- 新しいレシピ -->
+<div id="newSheet" class="sheet-bg" hidden>
+  <div class="sheet" role="dialog" aria-label="新しいレシピ">
+    <h2>新しいレシピ <button id="closeNew" class="close-x" aria-label="とじる">✕</button></h2>
+    <div class="how-box">
+      <b>文章から作る（かんたん）</b>
+      <ol class="mini-how">
+        <li>レシピのページで「材料」と「作り方」をコピー</li>
+        <li>下に貼り付けて「読み取る」</li>
+        <li>手順・時間・火加減が入るので、確かめて保存</li>
+      </ol>
+    </div>
+    <textarea id="newText" class="inp" rows="7" placeholder="例:&#10;温泉卵&#10;材料&#10;卵 2個&#10;作り方&#10;1. 鍋に水を入れて沸かし、沸騰直前で火を止める。&#10;2. 卵を入れてふたをし、11分おく。&#10;3. 冷水に取る。"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="newPaste" class="link-btn" style="flex:none">貼り付け</button>
+      <button id="newParse" class="ok-btn" style="margin:0;flex:1;width:auto">読み取る</button>
+    </div>
+    <button id="newBlank" class="text-btn" style="margin-top:14px">一から自分で作る</button>
+  </div>
+</div>
+
+<!-- 取り込みの確認 -->
+<div id="impConfirm" class="sheet-bg center" hidden>
+  <div class="sheet gate" role="alertdialog" aria-labelledby="impTitle">
+    <h2 id="impTitle">レシピを取り込む？</h2>
+    <div id="impList" class="imp-list"></div>
+    <p id="impNote" class="note" hidden>ホーム画面のアプリに入れたいときは、「コピー」を押してから、アプリの 設定 →「読み込む」に貼り付けてください。</p>
+    <button id="impOk" class="ok-btn">取り込む</button>
+    <button id="impCopy" class="text-btn" hidden>リンクをコピー</button>
+    <button id="impCancel" class="text-btn">やめる</button>
+  </div>
+</div>
+
+<!-- つかいかた -->
+<div id="help" class="sheet-bg" hidden>
+  <div class="sheet" role="dialog" aria-label="つかいかた">
+    <h2>つかいかた <button id="closeHelp" class="close-x" aria-label="とじる">✕</button></h2>
+    <ol class="how">
+      <li><span class="n">1</span><span>レシピを選ぶ。手順の時間は、タップで <b>今回だけ</b> 変えられます</span></li>
+      <li><span class="n">2</span><span>「<b>はじめる</b>」。画面と声で、やることを案内します</span></li>
+      <li><span class="n">3</span><span>時間が来たら、画面の <b>どこでもタップ</b> で次の手順へ</span></li>
+      <li><span class="n">4</span><span>できあがり！ 時間を変えた手順は「<b>次からこの時間にする？</b>」と聞きます</span></li>
+    </ol>
+    <h3>こんなときは</h3>
+    <div class="faq">
+      <p>時間を足したい・減らしたい<small>タイマーの「−30秒」「＋30秒」</small></p>
+      <p>早めに次へ進みたい<small>「次へ」。かかった時間を覚えられます</small></p>
+      <p>途中でやめたい<small>「ながおしで やめる」を長く押してね（ふつうに触っても止まりません）</small></p>
+      <p>音が鳴らなかった<small>ほかのアプリに切り替えると鳴りません。画面はつけたままにしてね</small></p>
+      <p>家族にレシピを渡したい<small>設定の「全部を送る」か、レシピの「送る」</small></p>
+    </div>
+    <button id="helpOk" class="ok-btn">わかった</button>
+  </div>
+</div>
+
+<!-- 音の確認 -->
+<div id="soundGate" class="sheet-bg center" hidden>
+  <div class="sheet gate" role="alertdialog" aria-labelledby="gateTitle" aria-describedby="gateMsg">
+    <div class="gate-icon">🔊</div>
+    <h2 id="gateTitle"></h2>
+    <p id="gateMsg"></p>
+    <button id="gateOk" class="ok-btn"></button>
+    <button id="gateCancel" class="text-btn">やめる</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(() => {
+  // ---------- 定数・保存 ----------
+  const TEST = new URLSearchParams(location.search).has('test');
+  const SCALE = TEST ? 1 / 12 : 1; // テストモードは 1分 = 5秒
+  const KEY = TEST ? 'steptimer-test.' : 'steptimer.';
+  const INK = '#5B4636';
+  const HEATS = { strong: '強火', medium: '中火', weak: '弱火', off: '火を止める', none: 'なし' };
+  const MIN_SEC = 10;
+
+  const load = (k, fallback) => {
+    try { const v = localStorage.getItem(KEY + k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  };
+  const save = (k, v) => {
+    try { v == null ? localStorage.removeItem(KEY + k) : localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {}
+  };
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = s => `${Math.floor(s / 60)}:${pad(s % 60)}`;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const uid = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  // ---------- 最初から入っているレシピ（一般的な目安） ----------
+  const S = (text, sec, heat, next = 'tap', tip = '') => ({ text, sec, heat, tip, next });
+  const PRESETS = [
+    { presetId: 'egg-soft', name: '半熟ゆで卵', items: '卵、鍋、お玉、ボウルに冷たい水', steps: [
+      S('鍋にたっぷりのお湯を沸かす', null, 'strong', 'tap', '卵は冷蔵庫から出したてでOK'),
+      S('お玉で卵をそっと入れる', null, 'medium'),
+      S('そのまま茹でる', 390, 'medium', 'tap', 'はじめの1分は、ときどき転がすと黄身が真ん中に'),
+      S('火を止めて、卵を冷たい水に入れて冷ます', 180, 'off'),
+    ] },
+    { presetId: 'egg-hard', name: '固ゆで卵', items: '卵、鍋、お玉、ボウルに冷たい水', steps: [
+      S('鍋にたっぷりのお湯を沸かす', null, 'strong'),
+      S('お玉で卵をそっと入れる', null, 'medium'),
+      S('そのまま茹でる', 660, 'medium'),
+      S('火を止めて、卵を冷たい水に入れて冷ます', 180, 'off'),
+    ] },
+    { presetId: 'onsen-egg', name: '温泉卵', items: '卵2個（60gくらい）、鍋（1.7Lくらい）、水1〜1.2L、お玉、蓋、冷たい水、めんつゆ（好みで）', steps: [
+      S('鍋に水を1〜1.2L入れて沸かす', null, 'strong', 'tap', '鍋底から泡がゆっくり上がってきたら（沸騰の手前）次へ'),
+      S('火を止めて、鍋を火からおろす', null, 'off', 'tap', 'お湯がぬるいと固まらないので注意'),
+      S('冷蔵庫から出したての卵を、お玉でそっと入れて蓋をする', null, 'off', 'tap', '一度に作るのは2個まで'),
+      S('蓋をしたまま置いておく', 660, 'off', 'tap', '10〜12分が目安。鍋によって変わるので、30秒ずつ直して好みを探してね'),
+      S('卵を冷たい水に取る', null, 'none', 'tap', '好みでめんつゆをかけてどうぞ'),
+    ] },
+    { presetId: 'pasta', name: 'パスタ', items: 'パスタ、大きめの鍋、塩（水1Lに10g）、トング、ザル', steps: [
+      S('鍋にたっぷりのお湯を沸かす', null, 'strong'),
+      S('塩とパスタを入れる', null, 'strong', 'tap', '袋の時間は、始める前の画面で合わせてね'),
+      S('茹でる', 420, 'medium', 'tap', 'はじめの1分は、ときどき混ぜる'),
+      S('火を止めて、ザルにあげる', null, 'off', 'tap', 'ゆで汁を少し取っておくと、ソースに使えます'),
+    ] },
+    { presetId: 'broccoli', name: '蒸しブロッコリー', items: 'ブロッコリー、フライパン、蓋、水（50ml）、塩少し', steps: [
+      S('小房に分けてフライパンに並べ、水と塩を入れる', null, 'none'),
+      S('蓋をして蒸す', 180, 'medium'),
+      S('蓋を取って、水気を飛ばす', 30, 'medium'),
+      S('火を止めて、お皿に取る', null, 'off'),
+    ] },
+    { presetId: 'chawanmushi', name: '茶碗蒸し', items: '卵液を入れた器、深めの鍋かフライパン、蓋、ふきん', steps: [
+      S('器が半分つかるくらいのお湯を沸かす', null, 'strong'),
+      S('器を入れて、ふきんで包んだ蓋を少しずらしてのせる', null, 'weak', 'tap', '蓋をずらすと、すが立ちにくい'),
+      S('弱火で蒸す', 720, 'weak', 'tap', '竹串を刺して、透明な汁が出ればOK'),
+      S('火を止めて、器を取り出す', null, 'off', 'tap', '熱いので気をつけて'),
+    ] },
+  ];
+  const presetCopy = p => ({ id: p.presetId, name: p.name, items: p.items, presetId: p.presetId, uses: 0, lastUsed: 0, steps: clone(p.steps) });
+
+  let settings = Object.assign({ voice: true }, load('settings', {}));
+  let recipes = load('recipes', null);
+  if (!Array.isArray(recipes)) { recipes = PRESETS.map(presetCopy); save('recipes', recipes); }
+  // 最初から入っているレシピの入れ替えを、もう保存してあるレシピにも反映する
+  // ・なくなったもの（例: ご飯・焼き餃子）は消す ・新しく足したもの（例: 温泉卵）は足す
+  // ・利用者が自分で消したものは、もう一度は足さない（presetsSeen で覚える）
+  (() => {
+    const ids = new Set(PRESETS.map(p => p.presetId));
+    const seen = new Set(load('presetsSeen', recipes.map(r => r.presetId).filter(Boolean)));
+    const before = recipes.length;
+    recipes = recipes.filter(r => !r.presetId || ids.has(r.presetId));
+    let changed = recipes.length !== before;
+    for (const p of PRESETS) {
+      if (seen.has(p.presetId)) continue;
+      seen.add(p.presetId);
+      if (!recipes.some(r => r.presetId === p.presetId)) {
+        const c = presetCopy(p);
+        if (recipes.some(r => r.id === c.id)) c.id = uid();
+        recipes.push(c);
+        changed = true;
+      }
+    }
+    if (changed) save('recipes', recipes);
+    save('presetsSeen', [...seen]);
+  })();
+  let run = load('run', null);
+  const saveRecipes = () => save('recipes', recipes);
+  const findRecipe = id => recipes.find(r => r.id === id);
+
+  // ---------- おなべの子 ----------
+  const SK = `fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"`;
+  const dot = (x, r = 6) => `<circle cx="${x}" cy="118" r="${r}" fill="${INK}"/>`;
+  const arcUp = x => `<path d="M${x - 8} 121 Q${x} 110 ${x + 8} 121" ${SK}/>`;
+  const smile = `<path d="M89 134 Q100 144 111 134" ${SK}/>`;
+  const openMouth = `<path d="M87 132 Q100 152 113 132 Z" fill="#FF7A7A" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>`;
+  const FACES = {
+    normal: dot(76) + dot(124) + smile,
+    hot: `<path d="M68 112 l14 7 -14 7" ${SK}/><path d="M132 112 l-14 7 14 7" ${SK}/>` + openMouth,
+    warm: arcUp(76) + arcUp(124) + smile,
+    sleep: `<path d="M68 118 Q76 125 84 118" ${SK}/><path d="M116 118 Q124 125 132 118" ${SK}/><ellipse cx="100" cy="136" rx="4" ry="5" fill="${INK}"/>`,
+    wow: `<circle cx="76" cy="116" r="9" fill="${INK}"/><circle cx="79" cy="113" r="3" fill="#fff"/><circle cx="124" cy="116" r="9" fill="${INK}"/><circle cx="127" cy="113" r="3" fill="#fff"/><ellipse cx="100" cy="139" rx="8" ry="9" fill="${INK}"/>`,
+    happy: arcUp(76) + arcUp(124) + openMouth,
+  };
+  const ZZZ = `<g class="zzz"><text x="150" y="58" font-size="22">z</text><text x="162" y="40" font-size="17">z</text><text x="172" y="26" font-size="13">z</text></g>`;
+  const SPARK = `<g fill="#FFC93C" stroke="${INK}" stroke-width="3" stroke-linejoin="round"><path d="M30 50 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4z"/><path d="M168 40 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z"/><path d="M176 120 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3z"/></g>`;
+  const flame = x => `<path class="flame" d="M${x} 196 Q${x - 11} 188 ${x - 5} 176 Q${x - 2} 182 ${x} 180 Q${x - 2} 170 ${x + 4} 164 Q${x + 4} 174 ${x + 9} 180 Q${x + 12} 188 ${x} 196 Z" fill="#FF8A3D" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>`;
+  const FLAMES = { strong: [74, 100, 126], medium: [87, 113], weak: [100] };
+  const STEAM = `<g class="steam" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"><path d="M78 30 q-6 -8 0 -16 q6 -8 0 -16"/><path d="M100 26 q-6 -8 0 -16 q6 -8 0 -16"/><path d="M122 30 q-6 -8 0 -16 q6 -8 0 -16"/></g>`;
+  // state: strong / medium / weak / off / none / alarm / done / idle
+  function pot(state = 'idle') {
+    const face = { strong: 'hot', medium: 'normal', weak: 'warm', off: 'sleep', none: 'normal', alarm: 'wow', done: 'happy', idle: 'normal' }[state] || 'normal';
+    const fl = (FLAMES[state] || []).map(flame).join('');
+    const steam = ['strong', 'medium', 'weak', 'done'].includes(state) ? STEAM : '';
+    return `<svg class="heat-${state}" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      ${state === 'done' ? SPARK : ''}
+      <g transform="translate(0 6)">${fl}</g>
+      <g transform="translate(0 -8)">
+      ${steam}
+      <rect x="18" y="86" width="30" height="16" rx="8" fill="#9FB4C7" stroke="${INK}" stroke-width="5"/>
+      <rect x="152" y="86" width="30" height="16" rx="8" fill="#9FB4C7" stroke="${INK}" stroke-width="5"/>
+      <path d="M36 74 L164 74 L158 152 Q156 170 136 170 L64 170 Q44 170 42 152 Z" fill="#E9F1F8" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M50 84 L58 150" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".9"/>
+      <ellipse cx="62" cy="134" rx="10" ry="6" fill="#FFB8B0" opacity=".85"/>
+      <ellipse cx="138" cy="134" rx="10" ry="6" fill="#FFB8B0" opacity=".85"/>
+      ${FACES[face]}
+      <g class="lid">
+        <path d="M28 76 Q100 34 172 76 Z" fill="#C9D7E4" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
+        <rect x="88" y="40" width="24" height="14" rx="7" fill="#FF8A5B" stroke="${INK}" stroke-width="5"/>
+      </g>
+      </g>
+      ${state === 'off' ? ZZZ : ''}
+    </svg>`;
+  }
+
+  // ---------- 音・声（MeltTime と同じ仕組み） ----------
+  let actx = null;
+  let silentEl = null, silentStopTimer = null;
+  function silentWavUrl() {
+    const rate = 8000, n = rate / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+    str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function holdMediaSession() {
+    clearTimeout(silentStopTimer);
+    try {
+      if (!silentEl) { silentEl = new Audio(silentWavUrl()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); }
+      if (silentEl.paused) silentEl.play().catch(() => {});
+    } catch {}
+  }
+  function releaseMediaSession(after = 0) {
+    clearTimeout(silentStopTimer);
+    silentStopTimer = setTimeout(() => { if (!run) try { silentEl && silentEl.pause(); } catch {} }, after);
+  }
+  const audioOk = () => !!actx && actx.state === 'running';
+  function unlockAudio(hold = !!run) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+    if (hold) holdMediaSession();
+    try {
+      if (actx && actx.state === 'closed') actx = null;
+      if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+      if (actx && actx.state !== 'running') actx.resume().catch(() => {});
+      if (actx) { const s = actx.createBufferSource(); s.buffer = actx.createBuffer(1, 1, 22050); s.connect(actx.destination); s.start(0); }
+    } catch {}
+  }
+  function resetAudio() { try { actx && actx.close(); } catch {} actx = null; }
+  function tone(freq, at, dur, vol = 0.35) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(at); o.stop(at + dur + 0.05);
+  }
+  // ok: ポン / step: 自動で次へ / alarm: 時間です / done: できあがり
+  function chime(kind) {
+    if (!actx) return;
+    try {
+      const t = actx.currentTime + 0.05;
+      const notes = kind === 'ok' ? [[880, 0], [1318, 0.14]]
+        : kind === 'step' ? [[988, 0], [1318, 0.2]]
+        : kind === 'done' ? [[784, 0], [988, 0.18], [1175, 0.36], [1568, 0.54]]
+        : [[1046, 0], [784, 0.45], [1046, 1.2], [784, 1.65]];
+      for (const [f, d] of notes) { tone(f, t + d, 1.0); tone(f * 2, t + d, 0.5, 0.08); }
+    } catch {}
+  }
+  let jaVoice = null;
+  function pickVoice() {
+    try {
+      const ja = speechSynthesis.getVoices().filter(v => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith('ja'));
+      ja.sort((a, b) => voiceScore(b) - voiceScore(a));
+      jaVoice = ja[0] || null;
+    } catch {}
+  }
+  function voiceScore(v) {
+    const s = (v.name + ' ' + v.voiceURI).toLowerCase();
+    let score = 0;
+    if (/premium|プレミアム/.test(s)) score += 40;
+    if (/enhanced|拡張/.test(s)) score += 30;
+    if (/natural|neural|siri/.test(s)) score += 30;
+    if (/google/.test(s)) score += 15;
+    if (/compact|eloquence/.test(s)) score -= 20;
+    if (v.localService) score += 1;
+    return score;
+  }
+  if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function speak(text) {
+    if (!settings.voice || !('speechSynthesis' in window) || !text) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP'; u.rate = 0.95;
+      if (jaVoice) u.voice = jaVoice;
+      const go = () => { try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch {} };
+      if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(go, 150); }
+      else go();
+    } catch {}
+  }
+  function primeSpeech() {
+    if (!settings.voice || !('speechSynthesis' in window)) return;
+    try { const u = new SpeechSynthesisUtterance('あ'); u.volume = 0; speechSynthesis.speak(u); } catch {}
+  }
+  let announceTimer = null;
+  function announce(kind, text) {
+    chime(kind);
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => speak(text), kind === 'alarm' ? 2400 : kind === 'done' ? 1300 : 700);
+  }
+
+  // ---------- 画面をつけっぱなしにする ----------
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!('wakeLock' in navigator)) { $('awakeNote').hidden = false; return; }
+    try {
+      if (!wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    } catch { $('awakeNote').hidden = false; }
+  }
+  function releaseAwake() { try { wakeLock && wakeLock.release(); } catch {} wakeLock = null; }
+
+  // ---------- 画面切り替え ----------
+  function show(id, heat = '') {
+    for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id);
+    document.body.dataset.phase = id;
+    document.body.dataset.heat = heat;
+    window.scrollTo(0, 0);
+  }
+  let toastTimer;
+  // action = [ボタンの文字, 押したときの処理]（任意）
+  function toast(msg, ms = 2400, action = null) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.toggle('has-btn', !!action);
+    if (action) {
+      const b = document.createElement('button');
+      b.textContent = action[0];
+      b.onclick = () => { t.classList.remove('show', 'has-btn'); clearTimeout(toastTimer); action[1](); };
+      t.appendChild(b);
+    }
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show', 'has-btn'), ms);
+  }
+  const totalSec = r => r.steps.reduce((a, s) => a + (s.sec || 0), 0);
+  const aboutMin = s => s >= 60 ? `約${Math.round(s / 60)}分` : `${s}秒`;
+
+  // ---------- ホーム ----------
+  const GRIP = `<svg viewBox="0 0 18 26" fill="currentColor"><circle cx="5" cy="5" r="2.4"/><circle cx="13" cy="5" r="2.4"/><circle cx="5" cy="13" r="2.4"/><circle cx="13" cy="13" r="2.4"/><circle cx="5" cy="21" r="2.4"/><circle cx="13" cy="21" r="2.4"/></svg>`;
+  function renderHome() {
+    $('homeChara').innerHTML = pot('idle');
+    const list = recipes; // 並び順 = 保存してある順（つかんで変えられる）
+    $('delMode').hidden = !list.length;
+    $('recipeList').innerHTML = list.length ? list.map(r => {
+      const t = totalSec(r);
+      return `<button class="recipe-btn" data-id="${esc(r.id)}"><span class="grip" aria-hidden="true">${GRIP}</span><div><div class="nm">${esc(r.name || '（名前なし）')}</div>
+        <div class="sm">手順 ${r.steps.length}つ${t ? `　／　タイマー ${aboutMin(t)}` : ''}</div></div><span class="go">›</span><span class="del" role="button" aria-label="消す">消す</span></button>`;
+    }).join('') : '<p class="warn" style="text-align:center">レシピがありません。「＋ 新しいレシピ」で作れます。</p>';
+  }
+  let justDragged = false;
+  $('recipeList').addEventListener('click', e => {
+    if (justDragged) { justDragged = false; return; }
+    const b = e.target.closest('.recipe-btn');
+    if (!b) return;
+    if (delMode) { if (e.target.closest('.del')) deleteRecipe(b.dataset.id); return; }
+    if (!e.target.closest('.grip')) openPrep(b.dataset.id);
+  });
+
+  // ---------- ホームで消す（消したあと「元に戻す」ができる） ----------
+  let delMode = false;
+  function setDelMode(on) {
+    delMode = on;
+    $('recipeList').classList.toggle('deleting', on);
+    $('delMode').classList.toggle('on', on);
+    $('delMode').textContent = on ? '消しおわった' : 'レシピを消す';
+    $('addRecipe').hidden = on;
+    $('sortNote').textContent = on ? '消したいレシピの「消す」を押してください' : '左の つまみ（または長押し）で つかむと、順番を変えられます';
+  }
+  $('delMode').onclick = () => setDelMode(!delMode);
+  function deleteRecipe(id) {
+    const at = recipes.findIndex(r => r.id === id);
+    if (at < 0) return;
+    const [gone] = recipes.splice(at, 1);
+    saveRecipes();
+    if (prepId === id) prepId = null;
+    renderHome();
+    if (!recipes.length) setDelMode(false);
+    toast(`「${gone.name}」を消しました`, 6000, ['元に戻す', () => {
+      recipes.splice(Math.min(at, recipes.length), 0, gone);
+      saveRecipes();
+      renderHome();
+      toast('元に戻しました');
+    }]);
+  }
+
+  // ---------- ホームの並べ替え（つまみをつかむ、またはカードを長押し） ----------
+  (() => {
+    const list = $('recipeList');
+    let drag = null, press = null;
+    const cards = () => [...list.querySelectorAll('.recipe-btn')];
+    function begin(card, y, pointerId) {
+      press = null;
+      for (const c of cards()) c.classList.remove('pressing');
+      const r = card.getBoundingClientRect();
+      drag = { card, grab: y - r.top, pointerId };
+      try { list.setPointerCapture(pointerId); } catch {}
+      card.classList.add('dragging');
+      list.classList.add('sorting');
+    }
+    function move(y) {
+      const { card } = drag;
+      card.style.transform = '';
+      // 指の位置より上にある（中心が上の）カードの数 = 入る場所
+      const others = cards().filter(c => c !== card);
+      const at = others.filter(c => { const r = c.getBoundingClientRect(); return r.top + r.height / 2 < y; }).length;
+      const ref = others[at] || null;
+      if (card.nextElementSibling !== ref || (ref === null && list.lastElementChild !== card)) list.insertBefore(card, ref);
+      card.style.transform = `translateY(${y - drag.grab - card.getBoundingClientRect().top}px)`;
+      // 画面の端に近づいたら、少しスクロールする
+      if (y < 70) window.scrollBy(0, -10);
+      else if (y > window.innerHeight - 70) window.scrollBy(0, 10);
+    }
+    function end() {
+      if (!drag) return;
+      const { card } = drag;
+      card.style.transform = '';
+      card.classList.remove('dragging');
+      list.classList.remove('sorting');
+      drag = null;
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 400);
+      const order = cards().map(c => c.dataset.id);
+      const before = recipes.map(r => r.id).join();
+      recipes.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+      if (recipes.map(r => r.id).join() !== before) saveRecipes();
+    }
+    function cancelPress() {
+      if (!press) return;
+      clearTimeout(press.timer);
+      press.card.classList.remove('pressing');
+      press = null;
+    }
+    list.addEventListener('pointerdown', e => {
+      const card = e.target.closest('.recipe-btn');
+      if (!card || drag) return;
+      if (e.target.closest('.grip')) { e.preventDefault(); begin(card, e.clientY, e.pointerId); return; }
+      cancelPress();
+      card.classList.add('pressing');
+      press = { card, x: e.clientX, y: e.clientY, timer: setTimeout(() => begin(card, e.clientY, e.pointerId), 450) };
+    });
+    list.addEventListener('pointermove', e => {
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) cancelPress();
+      if (drag && e.pointerId === drag.pointerId) { e.preventDefault(); move(e.clientY); }
+    });
+    for (const ev of ['pointerup', 'pointercancel']) list.addEventListener(ev, () => { cancelPress(); end(); });
+    list.addEventListener('pointerleave', cancelPress);
+    // つかんでいる間は、画面がスクロールしないようにする（iPhone）
+    list.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+    list.addEventListener('contextmenu', e => e.preventDefault());
+  })();
+  // ---------- 新しいレシピ（文章を貼り付けて作る） ----------
+  $('addRecipe').onclick = () => { $('newSheet').hidden = false; };
+  const closeNew = () => { $('newSheet').hidden = true; };
+  $('closeNew').onclick = closeNew;
+  $('newSheet').addEventListener('click', e => { if (e.target.id === 'newSheet') closeNew(); });
+  $('newBlank').onclick = () => { closeNew(); openEdit(null); };
+  $('newPaste').onclick = async () => {
+    try { const t = await navigator.clipboard.readText(); if (t) $('newText').value = t; else toast('コピーした文章がありません'); }
+    catch { toast('入力欄を長押しして「ペースト」してください'); }
+  };
+  $('newParse').onclick = () => {
+    const text = $('newText').value;
+    if (!text.trim()) return toast('レシピの文章を貼り付けてください');
+    const r = parseRecipeText(text);
+    if (!r.steps.length) return toast('手順を読み取れませんでした');
+    closeNew();
+    $('newText').value = '';
+    openEdit(null, r);
+    const timed = r.steps.filter(s => s.sec != null).length;
+    toast(`手順 ${r.steps.length}つ（タイマー ${timed}つ）を読み取りました。確かめて保存してね`, 4000);
+  };
+
+  // 貼り付けた文章を、レシピ（名前・必要な物・手順）に分ける
+  function parseRecipeText(raw) {
+    const z2h = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/(?<=\d)\s*[～〜~－\-―‐ー]\s*(?=\d)/g, '〜').replace(/[：]/g, ':').replace(/　/g, ' ');
+    const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+    const lines = z2h(raw).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const isHead = (l, re) => re.test(l.replace(/[【】\[\]■●◆◇□○・<>＜＞《》:]/g, '').trim()) && l.length <= 16;
+    const ITEMS_HEAD = /^(材料|材料と分量|用意するもの|準備するもの|道具)([(（].*[)）])?(\s*\d+.*分)?$/;
+    const BARE_NUM = new RegExp(`^(?:(?:STEP|Step|ステップ)\\s*)?(?:\\d{1,2}|[${CIRCLED}])[.．、)）]?$`);
+    const STEPS_HEAD = /^(作り方|手順|つくり方|作りかた|調理手順|レシピ)$/;
+    const NUM = new RegExp(`^(?:(?:STEP|Step|ステップ)\\s*(\\d+)[\\s.:、]*|(\\d{1,2})\\s*[.．、)）:]\\s*|(\\d{1,2})\\s+(?=\\D)|([${CIRCLED}])\\s*)`);
+    let name = '', mode = 'top';
+    const items = [], blocks = [], tips = [];
+    for (const l of lines) {
+      if (isHead(l, ITEMS_HEAD)) { mode = 'items'; continue; }
+      if (isHead(l, STEPS_HEAD)) { mode = 'steps'; blocks.push(null); continue; }
+      if (/^(ポイント|コツ|POINT|Point|memo|メモ)\s*[:：]?$/.test(l)) { mode = 'tips'; continue; }
+      // 番号だけの行（「1」の次の行に本文がある形）は、新しい手順の始まり
+      if (BARE_NUM.test(l) && mode !== 'items') { mode = 'steps'; blocks.push(''); continue; }
+      const m = l.match(NUM);
+      if (m && mode !== 'items') { mode = 'steps'; blocks.push(l.slice(m[0].length).trim()); continue; }
+      if (/^[※＊*]/.test(l) || /^(ポイント|コツ)\s*[:：]/.test(l)) {
+        const t = l.replace(/^[※＊*]\s*|^(ポイント|コツ)\s*[:：]\s*/g, '');
+        if (blocks.length && blocks[blocks.length - 1] != null) blocks.push({ tip: t }); else tips.push(t);
+        continue;
+      }
+      // 最初の短い行は名前。ただし「〜する」「〜く」などで終わる行は手順とみなす
+      if (mode === 'top') { if (!name && !items.length && l.length <= 30 && !/[るすくうつぐむぶぬたて。]$/.test(l)) name = l.replace(/(の作り方|のレシピ|\s*レシピ)$/, ''); else items.push(l); continue; }
+      if (mode === 'items') { items.push(l.replace(/\s+/g, ' ')); continue; }
+      if (mode === 'tips') { tips.push(l); continue; }
+      // 番号のない行: 直前の手順の続き。手順がまだ無ければ、新しい手順
+      if (blocks.length && typeof blocks[blocks.length - 1] === 'string') blocks[blocks.length - 1] += l;
+      else blocks.push(l);
+    }
+    // 番号も見出しもなかったら、1行を1手順とみなす
+    let texts = blocks.filter(b => b != null && b !== '');
+    if (!texts.some(b => typeof b === 'string') && mode === 'top' && items.length) { texts = items.splice(0); }
+    const steps = [];
+    let heat = 'none';
+    for (const b of texts) {
+      if (typeof b === 'object') { if (steps.length) steps[steps.length - 1].tip = (steps[steps.length - 1].tip ? steps[steps.length - 1].tip + ' ' : '') + b.tip; continue; }
+      // 文に分けて、時間がある文を「タイマーの手順」、それ以外をまとめて「作業の手順」にする
+      const sentences = b.split(/(?<=。)/).map(s => s.trim()).filter(Boolean);
+      let buf = '';
+      const flush = sec => {
+        if (!buf) return;
+        let text = buf.replace(/。$/, '');
+        const tipM = text.match(/[（(]([^（）()]{4,})[）)]$/);
+        let tip = '';
+        if (tipM) { tip = tipM[1]; text = text.slice(0, tipM.index).trim(); }
+        heat = heatOf(text, heat);
+        steps.push({ text: text.slice(0, 200), sec, heat, tip: tip.slice(0, 200), next: 'tap' });
+        buf = '';
+      };
+      for (const s of sentences) {
+        const sec = timeOf(s);
+        if (sec != null) { flush(null); buf = s; flush(sec); }
+        else buf += s;
+      }
+      flush(null);
+    }
+    if (tips.length && steps.length) steps[0].tip = (steps[0].tip ? steps[0].tip + ' ' : '') + tips.join(' ').slice(0, 200);
+    return { name: (name || '新しいレシピ').slice(0, 40), items: items.join('、').replace(/、{2,}/g, '、').slice(0, 500), steps };
+  }
+  // 文の中の待ち時間（秒）。「10〜12分」は真ん中を30秒単位で。「1時間30分」「2分30秒」「90秒」にも対応
+  // 「1分短く」「5分前」「3分おきに」のような、待ち時間ではない書き方は飛ばす
+  function timeOf(s) {
+    const re = /(\d+(?:\.\d+)?)\s*〜\s*(\d+(?:\.\d+)?)\s*(分|秒)|(\d+)\s*時間(?:\s*(\d+)\s*分)?|(\d+(?:\.\d+)?)\s*分(?:\s*(\d+)\s*秒)?|(\d+)\s*秒/g;
+    for (const m of s.matchAll(re)) {
+      const after = s.slice(m.index + m[0].length);
+      if (/^\s*(短|長|前|おき|ごと|の\d|以上前|ほど前)/.test(after) || /^の/.test(after) && /分の/.test(m[0] + after.slice(0, 1))) continue;
+      if (m[1]) { const mid = (Number(m[1]) + Number(m[2])) / 2; return m[3] === '秒' ? Math.round(mid) : Math.round(mid * 2) * 30; }
+      if (m[4]) return Number(m[4]) * 3600 + Number(m[5] || 0) * 60;
+      if (m[6]) return Math.round(Number(m[6]) * 60) + Number(m[7] || 0);
+      if (m[8]) return Number(m[8]);
+    }
+    return null;
+  }
+  // 文の中の火加減。書いていなければ、前の手順の火加減を引きつぐ
+  function heatOf(s, prev) {
+    if (/火を止め|火からおろ|火から下ろ|火を消|余熱/.test(s)) return 'off';
+    if (/電子レンジ|レンジで|オーブン|トースター|冷蔵庫で|冷蔵庫に入れ|冷凍庫/.test(s)) return 'none';
+    if (/弱めの中火|中火弱/.test(s)) return 'medium';
+    if (/強めの中火|中火強/.test(s)) return 'medium';
+    if (/強火/.test(s)) return 'strong';
+    if (/中火/.test(s)) return 'medium';
+    if (/弱火|とろ火/.test(s)) return 'weak';
+    if (/沸か|沸騰|ゆでる|茹でる|焼く|炒め|煮/.test(s) && prev === 'none') return 'medium';
+    return prev;
+  }
+
+  // ---------- 始める前 ----------
+  let prepId = null, prepOverride = [];
+  function openPrep(id) {
+    const r = findRecipe(id);
+    if (!r) return;
+    if (prepId !== id) prepOverride = [];
+    prepId = id;
+    renderPrep();
+    show('prep');
+  }
+  function renderPrep() {
+    const r = findRecipe(prepId);
+    if (!r) { show('home'); renderHome(); return; }
+    $('prepName').textContent = r.name || '（名前なし）';
+    $('prepItems').textContent = r.items || '';
+    $('prepItemsBox').hidden = !r.items;
+    $('prepPresetNote').hidden = !r.presetId;
+    $('prepList').innerHTML = r.steps.map((s, i) => {
+      const sec = prepOverride[i] ?? s.sec;
+      const heat = s.heat && s.heat !== 'none' ? `<span class="chip ${s.heat}">${HEATS[s.heat]}</span>` : '';
+      const nx = s.sec == null ? '' : s.next === 'auto' ? '自動で次へ' : 'タップで次へ';
+      const tm = s.sec == null
+        ? `<span class="tm none">時間なし</span>`
+        : `<button class="tm${prepOverride[i] != null ? ' changed' : ''}" data-i="${i}">${fmt(sec)}</button>`;
+      return `<li><span class="n">${i + 1}</span><span class="tx">${heat}${esc(s.text)}${nx ? `<small>${nx}</small>` : ''}</span>${tm}</li>`;
+    }).join('');
+    $('startBtn').disabled = !r.steps.length;
+  }
+  $('prepList').addEventListener('click', e => {
+    const b = e.target.closest('button.tm');
+    if (!b) return;
+    const i = Number(b.dataset.i), r = findRecipe(prepId), s = r.steps[i];
+    openTimeSheet({
+      title: `今回だけ: ${s.text}`, sec: prepOverride[i] ?? s.sec, orig: s.sec, allowNone: false,
+      onOk: v => { prepOverride[i] = v === s.sec ? undefined : v; renderPrep(); },
+    });
+  });
+  $('prepBack').onclick = () => { show('home'); renderHome(); };
+  $('prepEdit').onclick = () => openEdit(prepId);
+  $('startBtn').onclick = () => openGate('start');
+
+  // ---------- 時間の入力シート ----------
+  let ts = null;
+  function openTimeSheet(o) {
+    ts = Object.assign({}, o, { cur: o.sec ?? 60 });
+    $('tsTitle').textContent = o.title;
+    $('tsNone').hidden = !o.allowNone;
+    $('tsRevert').hidden = o.orig == null || o.allowNone;
+    $('tsOrig').textContent = o.orig != null && !o.allowNone ? `いつもの時間: ${fmt(o.orig)}` : '';
+    renderTs();
+    $('timeSheet').hidden = false;
+  }
+  function renderTs() { $('tsBig').textContent = fmt(ts.cur); }
+  for (const b of document.querySelectorAll('#timeSheet .grid4 button')) {
+    b.onclick = () => { ts.cur = Math.min(5999, Math.max(MIN_SEC, ts.cur + Number(b.dataset.d))); renderTs(); };
+  }
+  const closeTs = () => { $('timeSheet').hidden = true; ts = null; };
+  $('tsOk').onclick = () => { const t = ts; closeTs(); t.onOk(t.cur); };
+  $('tsNone').onclick = () => { const t = ts; closeTs(); t.onOk(null); };
+  $('tsRevert').onclick = () => { const t = ts; closeTs(); t.onOk(t.orig); };
+  $('tsClose').onclick = closeTs;
+  $('timeSheet').addEventListener('click', e => { if (e.target.id === 'timeSheet') closeTs(); });
+
+  // ---------- タイマー ----------
+  // run = { recipeId, name, steps(今回の時間を入れた写し), base(レシピの時間), early(今回だけ変えた印),
+  //         index, stepStartAt, pausedAt, adj[], actual[], alarmAt }
+  let ticker = null, lastRing = 0, ringCount = 0;
+  const durMs = i => Math.max(MIN_SEC, run.steps[i].sec + (run.adj[i] || 0)) * 1000 * SCALE;
+  const elapsedMs = () => (run.pausedAt || Date.now()) - run.stepStartAt;
+  const saveRun = () => save('run', run);
+
+  function start() {
+    const r = findRecipe(prepId);
+    if (!r || !r.steps.length) return;
+    unlockAudio(true);
+    r.uses = (r.uses || 0) + 1;
+    r.lastUsed = Date.now();
+    saveRecipes();
+    const steps = r.steps.map((s, i) => Object.assign(clone(s), prepOverride[i] != null ? { sec: prepOverride[i] } : {}));
+    run = {
+      recipeId: r.id, name: r.name, steps, base: r.steps.map(s => s.sec),
+      prep: r.steps.map((_, i) => prepOverride[i] != null),
+      index: 0, stepStartAt: Date.now(), pausedAt: null, adj: [], actual: [], alarmAt: null,
+    };
+    prepOverride = [];
+    saveRun();
+    speak(steps[0].text);
+    beginRunning();
+  }
+
+  function beginRunning() {
+    show('run', run.steps[run.index].heat || 'none');
+    keepAwake();
+    clearInterval(ticker);
+    ticker = setInterval(tick, 250);
+    renderStep();
+    tick();
+  }
+
+  // 次の手順へ。at = 次の手順を始めた時刻
+  function advance(at, { say = true, kind = null } = {}) {
+    run.index++;
+    run.alarmAt = null;
+    run.pausedAt = null;
+    hideAlarm();
+    if (run.index >= run.steps.length) { saveRun(); return finish(); }
+    run.stepStartAt = at;
+    saveRun();
+    const s = run.steps[run.index];
+    if (kind) announce(kind, s.text);
+    else if (say) speak(s.text);
+    renderStep();
+    drawTime();
+  }
+
+  function renderStep() {
+    const s = run.steps[run.index], timed = s.sec != null;
+    document.body.dataset.heat = s.heat || 'none';
+    $('runName').textContent = run.name;
+    $('runPos').textContent = `${run.index + 1} / ${run.steps.length}`;
+    $('runHeat').textContent = HEATS[s.heat] || '';
+    $('runHeat').hidden = !s.heat || s.heat === 'none';
+    $('timedBox').style.display = timed ? 'contents' : 'none';
+    $('manualChara').hidden = timed;
+    $('timedCtrls').hidden = !timed;
+    $('runDo').textContent = s.text;
+    $('runTip').textContent = s.tip || '';
+    $('runTip').hidden = !s.tip;
+    const nx = run.steps[run.index + 1];
+    $('runNext').innerHTML = nx ? `つぎ: <b>${esc(nx.text)}</b>` : 'これで最後です';
+    $('nextBtn').textContent = timed ? '次へ ›' : (nx ? 'できたら 次へ ›' : 'できたら おしまい');
+    $('nextBtn').classList.toggle('big', !timed);
+    const st = s.heat || 'none';
+    const target = timed ? $('runChara') : $('manualChara');
+    if (target.dataset.sig !== st) { target.dataset.sig = st; target.innerHTML = pot(st); }
+    renderPause();
+  }
+  function renderPause() {
+    const p = !!run.pausedAt;
+    $('pauseBtn').textContent = p ? '再開' : '一時停止';
+    $('time').classList.toggle('paused', p);
+    $('pausedLabel').hidden = !p;
+  }
+
+  function tick() {
+    if (!run) return;
+    watchAudio();
+    const now = Date.now();
+    // 時間が来た手順を進める（自動で次へは、戻ってきたときにまとめて進める）
+    let lateAuto = 0, guard = 0;
+    while (run && run.alarmAt == null && guard++ < 50) {
+      const s = run.steps[run.index];
+      if (s.sec == null || run.pausedAt) break;
+      const endAt = run.stepStartAt + durMs(run.index);
+      if (now < endAt) break;
+      if (s.next === 'auto') {
+        if (now - endAt > 5000) lateAuto = now - endAt;
+        advance(endAt, { kind: run.index + 1 < run.steps.length ? 'step' : null });
+        if (!run) return;
+      } else {
+        run.alarmAt = endAt;
+        saveRun();
+      }
+    }
+    if (!run) return;
+    if (lateAuto) toast(`${fmtLate(lateAuto)}前に、次の手順に進んでいます`, 4000);
+
+    if (run.alarmAt != null) return alarmTick(now);
+
+    drawTime();
+  }
+  function drawTime() {
+    const s = run.steps[run.index];
+    if (s.sec == null) return;
+    const total = durMs(run.index), passed = elapsedMs();
+    const left = Math.max(0, Math.ceil((total - passed) / 1000 / SCALE));
+    $('time').textContent = fmt(left);
+    $('ringFg').style.strokeDashoffset = (339.29 * Math.min(1, passed / total)).toFixed(2);
+  }
+  const fmtLate = ms => { const s = Math.round(ms / 1000 / SCALE); return s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? (s % 60) + '秒' : ''}` : `${s}秒`; };
+
+  // ---------- 時間が来たとき（タップで次へ） ----------
+  function alarmTick(now) {
+    const ov = $('alarm');
+    const since = now - run.alarmAt;
+    if (ov.hidden) {
+      const nx = run.steps[run.index + 1];
+      $('alarmChara').innerHTML = pot('alarm');
+      $('alarmTitle').textContent = nx ? '時間です！' : 'できあがり！';
+      $('alarmNext').innerHTML = nx
+        ? `つぎは${nx.heat && nx.heat !== 'none' ? `（${HEATS[nx.heat]}）` : ''}<b>${esc(nx.text)}</b>`
+        : `<b>${esc(run.steps[run.index].text)}</b>おしまい`;
+      const late = since > 3000;
+      $('alarmLate').hidden = !late;
+      if (late) $('alarmLate').textContent = `${fmtLate(since)}前に 終わっています`;
+      ov.hidden = false;
+      lastRing = 0; ringCount = 0;
+    }
+    ov.classList.toggle('quiet', since > 60000 && ringCount > 0);
+    // 1分までは約8秒おきに鳴らす。1分を過ぎて戻ってきたときも1回は鳴らす
+    if ((since <= 60000 || ringCount === 0) && now - lastRing >= 8000) {
+      lastRing = now; ringCount++;
+      const nx = run.steps[run.index + 1];
+      announce('alarm', nx ? `時間です。つぎは、${nx.text}` : 'できあがりです');
+    }
+  }
+  function hideAlarm() { $('alarm').hidden = true; $('alarm').classList.remove('quiet'); }
+  $('alarm').addEventListener('click', e => {
+    if (!run || run.alarmAt == null) return;
+    if (e.target.closest('#alarmMore')) {
+      // ＋30秒 のばす: 今の手順を延長して、タイマーに戻る
+      const i = run.index;
+      run.adj[i] = (run.adj[i] || 0) + 30;
+      run.stepStartAt = Date.now() - (durMs(i) - 30000 * SCALE);
+      run.alarmAt = null;
+      saveRun();
+      hideAlarm();
+      try { speechSynthesis.cancel(); } catch {}
+      clearTimeout(announceTimer);
+      chime('ok');
+      tick();
+      return;
+    }
+    try { speechSynthesis.cancel(); } catch {}
+    clearTimeout(announceTimer);
+    chime('ok');
+    advance(Date.now(), { say: false });
+  });
+
+  // ---------- 実行中のボタン ----------
+  function bump(d) {
+    if (!run || run.alarmAt != null) return;
+    const i = run.index, s = run.steps[i];
+    const cur = s.sec + (run.adj[i] || 0);
+    const nextSec = Math.max(MIN_SEC, cur + d);
+    run.adj[i] = nextSec - s.sec;
+    saveRun();
+    tick();
+    toast(`この手順を ${fmt(nextSec)} にしました`, 1500);
+  }
+  $('minus30').onclick = () => bump(-30);
+  $('plus30').onclick = () => bump(30);
+  $('pauseBtn').onclick = () => {
+    if (!run || run.alarmAt != null) return;
+    if (run.pausedAt) { run.stepStartAt += Date.now() - run.pausedAt; run.pausedAt = null; }
+    else run.pausedAt = Date.now();
+    saveRun();
+    renderPause();
+    tick();
+  };
+  $('nextBtn').onclick = () => {
+    if (!run || run.alarmAt != null) return;
+    const i = run.index, s = run.steps[i];
+    if (s.sec != null) {
+      const el = elapsedMs();
+      // 時間が来る前に次へ: かかった時間を覚える候補にする（5秒単位）
+      if (el < durMs(i)) run.actual[i] = Math.max(MIN_SEC, Math.round(el / 1000 / SCALE / 5) * 5);
+    }
+    chime('ok');
+    advance(Date.now());
+  };
+
+  function finish() {
+    const r = findRecipe(run.recipeId);
+    const cands = [];
+    if (r && r.steps.length === run.steps.length) {
+      run.steps.forEach((s, i) => {
+        if (s.sec == null || r.steps[i].sec == null) return;
+        const touched = run.actual[i] != null || (run.adj[i] || 0) !== 0;
+        const v = run.actual[i] ?? (s.sec + (run.adj[i] || 0));
+        if (v !== r.steps[i].sec && (touched || run.prep[i])) cands.push({ i, from: r.steps[i].sec, to: v, checked: touched });
+      });
+    }
+    const name = run.name, rid = run.recipeId;
+    stopRunning();
+    hideAlarm();
+    $('doneChara').innerHTML = pot('done');
+    $('doneName').textContent = name;
+    $('learnBox').hidden = !cands.length;
+    $('learnList').innerHTML = cands.map(c =>
+      `<label><input type="checkbox" data-i="${c.i}" data-v="${c.to}"${c.checked ? ' checked' : ''}><span>${esc(r.steps[c.i].text)}</span><span class="chg">${fmt(c.from)} → ${fmt(c.to)}</span></label>`).join('');
+    $('backBtn').textContent = cands.length ? '保存して もどる' : 'もどる';
+    $('backBtn').dataset.rid = rid;
+    show('done', '');
+    announce('done', 'できあがりです');
+    releaseMediaSession(8000);
+  }
+  $('backBtn').onclick = () => {
+    const r = findRecipe($('backBtn').dataset.rid);
+    let n = 0;
+    if (r) for (const c of document.querySelectorAll('#learnList input:checked')) {
+      const i = Number(c.dataset.i);
+      if (r.steps[i]) { r.steps[i].sec = Number(c.dataset.v); n++; }
+    }
+    if (n) { saveRecipes(); toast('時間を保存しました'); }
+    show('home');
+    renderHome();
+  };
+
+  function stopRunning() {
+    clearInterval(ticker);
+    ticker = null;
+    run = null;
+    save('run', null);
+    releaseAwake();
+    if (gateMode === 'resume') closeGate();
+  }
+
+  // ---------- 音の確認 ----------
+  let gateMode = null, lostAt = 0;
+  function openGate(mode) {
+    gateMode = mode;
+    const resume = mode === 'resume';
+    $('gateTitle').textContent = resume ? '音が止まっています' : '音が出ます';
+    $('gateMsg').innerHTML = resume ? 'タップすると、また鳴ります' : `${settings.voice ? 'チャイムと声' : 'チャイム'}で知らせます。<br>音を鳴らしていいですか？`;
+    $('gateOk').textContent = resume ? '音を出す' : 'はい、はじめる';
+    $('gateCancel').hidden = resume;
+    $('soundGate').hidden = false;
+  }
+  function closeGate() { $('soundGate').hidden = true; gateMode = null; lostAt = 0; }
+  function gateOk() {
+    const mode = gateMode;
+    if (actx && !audioOk()) resetAudio();
+    closeGate();
+    if (mode === 'start') { start(); chime('ok'); return; }
+    unlockAudio(true);
+    primeSpeech();
+    chime('ok');
+  }
+  function watchAudio() {
+    if (gateMode || document.visibilityState !== 'visible' || audioOk()) { lostAt = 0; return; }
+    try { actx && actx.resume().catch(() => {}); } catch {}
+    if (!lostAt) lostAt = Date.now();
+    else if (Date.now() - lostAt > 1500) openGate('resume');
+  }
+  $('gateOk').onclick = gateOk;
+  $('gateCancel').onclick = closeGate;
+  $('soundGate').addEventListener('click', e => {
+    if (e.target.id !== 'soundGate') return;
+    gateMode === 'resume' ? gateOk() : closeGate();
+  });
+
+  // 「やめる」は長押しだけ
+  (() => {
+    const btn = $('stopBtn'), MS = 1200;
+    let t = null;
+    btn.style.setProperty('--hold-ms', MS + 'ms');
+    const cancel = () => { clearTimeout(t); t = null; btn.classList.remove('holding'); };
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      btn.classList.add('holding');
+      t = setTimeout(() => {
+        cancel();
+        try { speechSynthesis.cancel(); } catch {}
+        clearTimeout(announceTimer);
+        stopRunning();
+        releaseMediaSession();
+        hideAlarm();
+        show('home');
+        renderHome();
+        toast('途中でやめました');
+      }, MS);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, cancel);
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  })();
+
+  document.addEventListener('pointerdown', () => unlockAudio(), { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && run) { keepAwake(); tick(); }
+  });
+
+  // ---------- レシピ編集 ----------
+  let draft = null, editingId = null;
+  const blankStep = () => S('', 60, 'medium');
+  function openEdit(id, fromText = null) {
+    const r = id ? findRecipe(id) : null;
+    editingId = r ? r.id : null;
+    draft = r ? clone(r) : { id: uid(), name: '', items: '', presetId: null, uses: 0, lastUsed: 0, steps: [blankStep()] };
+    if (!r && fromText) Object.assign(draft, { name: uniqueName(fromText.name), items: fromText.items, steps: fromText.steps });
+    $('editTitle').textContent = r ? 'レシピをなおす' : '新しいレシピ';
+    $('eName').value = draft.name;
+    $('eItems').value = draft.items || '';
+    $('eDup').hidden = $('eDelete').hidden = $('eShare').hidden = !r;
+    $('eReset').hidden = !(r && r.presetId && PRESETS.some(p => p.presetId === r.presetId));
+    renderSteps();
+    show('edit');
+  }
+  function renderSteps() {
+    const n = draft.steps.length;
+    $('eSteps').innerHTML = draft.steps.map((s, i) => `
+      <div class="estep" data-i="${i}">
+        <div class="estep-head"><span class="n">${i + 1}</span><span class="sp"></span>
+          <button class="mini" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="上へ">↑</button>
+          <button class="mini" data-act="down" ${i === n - 1 ? 'disabled' : ''} aria-label="下へ">↓</button>
+          <button class="mini danger" data-act="del" aria-label="消す">✕</button></div>
+        <textarea class="inp" data-f="text" rows="2" placeholder="やること（声で読みます）">${esc(s.text)}</textarea>
+        <div class="erow"><span class="lb">時間</span><button class="time-btn" data-act="time">${s.sec == null ? 'なし' : fmt(s.sec)}</button></div>
+        <div class="erow"><span class="lb">火加減</span><div class="seg">${Object.entries(HEATS).map(([k, v]) =>
+          `<button class="h-${k}" data-act="heat" data-v="${k}" aria-pressed="${s.heat === k}">${v}</button>`).join('')}</div></div>
+        ${s.sec == null ? '' : `<div class="erow"><span class="lb">終わったら</span><div class="seg">
+          <button data-act="next" data-v="tap" aria-pressed="${s.next !== 'auto'}">タップで次へ</button>
+          <button data-act="next" data-v="auto" aria-pressed="${s.next === 'auto'}">自動で次へ</button></div></div>`}
+        <div class="erow"><span class="lb">コツ</span><input class="inp" data-f="tip" style="flex:1" placeholder="なくてもOK（読みません）" value="${esc(s.tip)}"></div>
+      </div>`).join('');
+  }
+  $('eSteps').addEventListener('input', e => {
+    const box = e.target.closest('.estep'), f = e.target.dataset.f;
+    if (box && f) draft.steps[Number(box.dataset.i)][f] = e.target.value;
+  });
+  $('eSteps').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const i = Number(b.closest('.estep').dataset.i), s = draft.steps[i], act = b.dataset.act;
+    if (act === 'up' && i > 0) [draft.steps[i - 1], draft.steps[i]] = [draft.steps[i], draft.steps[i - 1]];
+    else if (act === 'down' && i < draft.steps.length - 1) [draft.steps[i + 1], draft.steps[i]] = [draft.steps[i], draft.steps[i + 1]];
+    else if (act === 'del') {
+      if (draft.steps.length <= 1) return toast('手順は1つ以上必要です');
+      draft.steps.splice(i, 1);
+    }
+    else if (act === 'heat') s.heat = b.dataset.v;
+    else if (act === 'next') s.next = b.dataset.v;
+    else if (act === 'time') {
+      return openTimeSheet({ title: `${i + 1}の時間`, sec: s.sec, orig: s.sec, allowNone: true,
+        onOk: v => { s.sec = v; if (v != null && !s.next) s.next = 'tap'; renderSteps(); } });
+    }
+    renderSteps();
+  });
+  $('eAddStep').onclick = () => { draft.steps.push(blankStep()); renderSteps(); setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0); };
+  $('eName').oninput = e => { draft.name = e.target.value; };
+  $('eItems').oninput = e => { draft.items = e.target.value; };
+  const leaveEdit = () => { if (editingId && findRecipe(editingId)) openPrep(editingId); else { show('home'); renderHome(); } };
+  $('editCancel').onclick = $('editCancelTop').onclick = leaveEdit;
+  $('editSave').onclick = () => {
+    draft.name = draft.name.trim();
+    if (!draft.name) { toast('名前を入れてください'); $('eName').focus(); return; }
+    draft.steps.forEach(s => { s.text = (s.text || '').trim(); s.tip = (s.tip || '').trim(); });
+    if (draft.steps.some(s => !s.text)) { toast('「やること」が空の手順があります'); return; }
+    const at = recipes.findIndex(r => r.id === draft.id);
+    if (at >= 0) recipes[at] = draft; else recipes.push(draft);
+    saveRecipes();
+    editingId = draft.id;
+    toast('保存しました');
+    if (prepId === draft.id) prepOverride = [];
+    openPrep(draft.id);
+  };
+  $('eDup').onclick = () => {
+    const r = findRecipe(editingId);
+    if (!r) return;
+    const c = clone(r);
+    Object.assign(c, { id: uid(), name: uniqueName(r.name), presetId: null, uses: 0, lastUsed: 0 });
+    recipes.push(c);
+    saveRecipes();
+    toast(`「${c.name}」を作りました`);
+    openEdit(c.id);
+  };
+  $('eDelete').onclick = () => {
+    const r = findRecipe(editingId);
+    if (!r || !confirm(`「${r.name}」を消しますか？`)) return;
+    recipes = recipes.filter(x => x.id !== r.id);
+    saveRecipes();
+    prepId = null;
+    show('home');
+    renderHome();
+    toast('消しました');
+  };
+  $('eReset').onclick = () => {
+    const p = PRESETS.find(p => p.presetId === draft.presetId);
+    if (!p || !confirm('最初の状態に戻しますか？（保存を押すまでは変わりません）')) return;
+    Object.assign(draft, { name: p.name, items: p.items, steps: clone(p.steps) });
+    $('eName').value = draft.name;
+    $('eItems').value = draft.items;
+    renderSteps();
+  };
+  $('eShare').onclick = () => { const r = findRecipe(editingId); if (r) shareLink([r]); };
+
+  // ---------- 保存・共有 ----------
+  const strip = r => ({ name: r.name, items: r.items || '', steps: r.steps.map(s => ({ text: s.text, sec: s.sec, heat: s.heat, tip: s.tip || '', next: s.next })) });
+  function uniqueName(name) {
+    const names = new Set(recipes.map(r => r.name));
+    if (!names.has(name)) return name;
+    let n = 2;
+    while (names.has(`${name}（${n}）`)) n++;
+    return `${name}（${n}）`;
+  }
+  function cleanRecipe(x) {
+    if (!x || typeof x.name !== 'string' || !Array.isArray(x.steps) || !x.steps.length) return null;
+    const steps = x.steps.map(s => ({
+      text: String(s && s.text || '').slice(0, 200),
+      sec: s && Number.isFinite(s.sec) && s.sec > 0 ? Math.min(5999, Math.round(s.sec)) : null,
+      heat: s && HEATS[s.heat] ? s.heat : 'none',
+      tip: String(s && s.tip || '').slice(0, 200),
+      next: s && s.next === 'auto' ? 'auto' : 'tap',
+    })).filter(s => s.text);
+    if (!steps.length) return null;
+    return { name: x.name.slice(0, 40) || 'レシピ', items: String(x.items || '').slice(0, 500), steps };
+  }
+  function addImported(list) {
+    let n = 0;
+    for (const x of list) {
+      const c = cleanRecipe(x);
+      if (!c) continue;
+      recipes.push(Object.assign(c, { id: uid(), name: uniqueName(c.name), presetId: null, uses: 0, lastUsed: 0 }));
+      n++;
+    }
+    saveRecipes();
+    return n;
+  }
+  const b64u = bytes => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const unb64u = str => { const s = atob(str.replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(s, c => c.charCodeAt(0)); };
+  async function pack(obj) {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    if (!('CompressionStream' in window)) return 'j' + b64u(bytes);
+    const out = await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+    return 'z' + b64u(new Uint8Array(out));
+  }
+  async function unpack(code) {
+    const kind = code[0], bytes = unb64u(code.slice(1));
+    let text;
+    if (kind === 'z') text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    else text = new TextDecoder().decode(bytes);
+    return JSON.parse(text);
+  }
+  const appUrl = () => location.origin + location.pathname + (TEST ? '?test' : '');
+  async function shareLink(list) {
+    try {
+      const url = `${appUrl()}#r=${await pack({ v: 1, recipes: list.map(strip) })}`;
+      const title = list.length === 1 ? `レシピ「${list[0].name}」` : `レシピ ${list.length}こ`;
+      if (navigator.share) { try { await navigator.share({ title, text: `${title}（おなべタイマー）`, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+      await navigator.clipboard.writeText(url);
+      toast('リンクをコピーしました。LINE などに貼り付けてね');
+    } catch { toast('リンクを作れませんでした'); }
+  }
+  async function exportFile() {
+    const d = new Date();
+    const name = `onabe-recipes-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+    const body = JSON.stringify({ app: 'onabe-timer', v: 1, recipes: recipes.map(strip) }, null, 1);
+    const file = new File([body], name, { type: 'application/json' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  // 取り込みの確認
+  let pending = null;
+  function confirmImport(list, fromLink) {
+    const ok = list.map(cleanRecipe).filter(Boolean);
+    if (!ok.length) { toast('取り込めるレシピがありませんでした'); return; }
+    pending = { list: ok, link: fromLink };
+    $('impTitle').textContent = `レシピを ${ok.length}こ 取り込む？`;
+    $('impList').innerHTML = ok.map(r => `・${esc(r.name)}`).join('<br>');
+    const outsideApp = !!fromLink && isIOS && !standalone;
+    $('impNote').hidden = !outsideApp;
+    $('impCopy').hidden = !outsideApp;
+    $('impConfirm').hidden = false;
+  }
+  const closeImp = () => { $('impConfirm').hidden = true; pending = null; };
+  $('impOk').onclick = () => {
+    if (!pending) return;
+    const n = addImported(pending.list);
+    closeImp();
+    $('importSheet').hidden = true;
+    $('settings').hidden = true;
+    show('home');
+    renderHome();
+    toast(`${n}こ 取り込みました`);
+  };
+  $('impCopy').onclick = async () => { try { await navigator.clipboard.writeText(pending.link); toast('コピーしました'); } catch { toast('コピーできませんでした'); } };
+  $('impCancel').onclick = closeImp;
+  function codeFrom(text) { const m = String(text).match(/#r=([A-Za-z0-9_-]+)/); return m ? m[1] : null; }
+  async function importText(text) {
+    try {
+      const code = codeFrom(text);
+      if (code) { const o = await unpack(code); return confirmImport(o.recipes || [], null); }
+      const o = JSON.parse(text);
+      confirmImport(Array.isArray(o) ? o : (o.recipes || []), null);
+    } catch { toast('読み込めませんでした'); }
+  }
+  async function checkHash() {
+    const code = codeFrom(location.hash);
+    if (!code) return;
+    const link = location.href;
+    history.replaceState(null, '', location.pathname + location.search);
+    try { const o = await unpack(code); confirmImport(o.recipes || [], link); }
+    catch { toast('リンクが壊れているようです'); }
+  }
+  window.addEventListener('hashchange', checkHash);
+
+  // ---------- 設定 ----------
+  function renderSettings() { $('voiceSw').setAttribute('aria-checked', String(settings.voice)); }
+  $('openSettings').onclick = () => { renderSettings(); $('settings').hidden = false; };
+  $('closeSettings').onclick = () => { $('settings').hidden = true; };
+  $('settings').addEventListener('click', e => { if (e.target.id === 'settings') $('settings').hidden = true; });
+  $('voiceSw').onclick = () => { settings.voice = !settings.voice; save('settings', settings); renderSettings(); };
+  $('testSound').onclick = () => { if (actx && !audioOk()) resetAudio(); unlockAudio(true); announce('alarm', '時間です。つぎは、水を入れて蓋をする'); releaseMediaSession(8000); };
+  $('exportFile').onclick = exportFile;
+  $('shareAll').onclick = () => recipes.length ? shareLink(recipes) : toast('レシピがありません');
+  $('restorePresets').onclick = () => {
+    const have = new Set(recipes.map(r => r.presetId).filter(Boolean));
+    const add = PRESETS.filter(p => !have.has(p.presetId));
+    if (!add.length) return toast('最初のレシピは全部あります');
+    for (const p of add) { const c = presetCopy(p); if (findRecipe(c.id)) c.id = uid(); recipes.push(c); }
+    saveRecipes();
+    renderHome();
+    toast(`${add.length}こ 戻しました`);
+  };
+  $('openImport').onclick = () => { $('pasteBox').value = ''; $('importSheet').hidden = false; };
+  $('closeImport').onclick = () => { $('importSheet').hidden = true; };
+  $('importSheet').addEventListener('click', e => { if (e.target.id === 'importSheet') $('importSheet').hidden = true; });
+  $('pickFile').onclick = () => $('fileInput').click();
+  $('fileInput').onchange = async e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f) importText(await f.text());
+  };
+  $('pasteOk').onclick = () => { const t = $('pasteBox').value.trim(); if (t) importText(t); else toast('リンクを貼り付けてね'); };
+
+  // ---------- つかいかた ----------
+  const openHelp = () => { $('help').hidden = false; };
+  function closeHelp() { $('help').hidden = true; save('helpSeen', true); }
+  $('openHelp').onclick = openHelp;
+  $('closeHelp').onclick = closeHelp;
+  $('helpOk').onclick = closeHelp;
+  $('help').addEventListener('click', e => { if (e.target.id === 'help') closeHelp(); });
+
+  // ---------- 起動 ----------
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  $('installHint').hidden = !(isIOS && !standalone);
+  $('testBadge').hidden = !TEST;
+  renderHome();
+  if (run && run.steps && run.steps[run.index]) { prepId = run.recipeId; beginRunning(); }
+  else {
+    if (run) save('run', null), run = null;
+    if (location.hash.includes('r=')) checkHash();
+    else if (!load('helpSeen', false)) openHelp();
+  }
+})();
+</script>
+</body>
+</html>
